@@ -1,0 +1,22 @@
+<template id="tpl-badge">
+    <span
+        class="status-wrap"
+        tabindex="0"
+        @mouseenter="showTooltip = true"
+        @mouseleave="showTooltip = false"
+        @focus="showTooltip = true"
+        @blur="showTooltip = false"
+    >
+        <span class="status-chip" :class="'status-' + status">
+            <template v-if="qty === 0">&#10006; Kosong</template>
+            <template v-else-if="qty < safety">&#9888; Menipis</template>
+            <template v-else>&#10004; Aman</template>
+        </span>
+
+        <span class="status-tooltip" role="tooltip" v-show="showTooltip">
+            <span class="tooltip-label">Catatan</span>
+            <span v-if="catatan" v-html="catatan"></span>
+            <span v-else>Tidak ada catatan.</span>
+        </span>
+    </span>
+</template>

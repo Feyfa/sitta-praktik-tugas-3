@@ -1,0 +1,131 @@
+<template id="tpl-order">
+    <div>
+        <!-- ===== JUDUL HALAMAN ===== -->
+        <div class="page-intro">
+            <p class="eyebrow">Pemesanan bahan ajar</p>
+            <h1>Buat Delivery Order</h1>
+            <p class="muted-copy">Isi data mahasiswa, pilih ekspedisi dan paket. Nomor DO dan total harga terisi otomatis.</p>
+        </div>
+
+        <div class="two-column">
+            <!-- ===== FORM DO BARU ===== -->
+            <section class="panel" aria-labelledby="order-title">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Delivery Order baru</p>
+                        <h2 id="order-title">Data pemesanan</h2>
+                    </div>
+                </div>
+
+                <form novalidate @submit.prevent="simpan" @keydown.enter="simpanDenganEnter">
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="do-nomor">Nomor DO</label>
+                            <input id="do-nomor" type="text" :value="nextNomorDO" readonly>
+                            <p class="field-hint">Dibuat otomatis.</p>
+                        </div>
+
+                        <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.nim }">
+                            <label for="do-nim">NIM</label>
+                            <input id="do-nim" type="text" inputmode="numeric" maxlength="9" placeholder="9 digit angka" v-model.trim="form.nim">
+                            <p class="field-error" v-if="submitAttempted && formErrors.nim">{{ formErrors.nim }}</p>
+                        </div>
+
+                        <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.nama }">
+                            <label for="do-nama">Nama mahasiswa</label>
+                            <input id="do-nama" type="text" placeholder="Nama lengkap" v-model="form.nama">
+                            <p class="field-error" v-if="submitAttempted && formErrors.nama">{{ formErrors.nama }}</p>
+                        </div>
+
+                        <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.ekspedisi }">
+                            <label for="do-ekspedisi">Ekspedisi</label>
+                            <select id="do-ekspedisi" v-model="form.ekspedisi">
+                                <option value="" disabled>Pilih ekspedisi</option>
+                                <option v-for="item in ekspedisi" :key="item.kode" :value="item.kode">JNE {{ item.nama }}</option>
+                            </select>
+                            <p class="field-error" v-if="submitAttempted && formErrors.ekspedisi">{{ formErrors.ekspedisi }}</p>
+                        </div>
+
+                        <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.tanggalKirim }">
+                            <label for="do-tanggal">Tanggal kirim</label>
+                            <input id="do-tanggal" type="date" v-model="form.tanggalKirim">
+                            <p class="field-error" v-if="submitAttempted && formErrors.tanggalKirim">{{ formErrors.tanggalKirim }}</p>
+                            <p class="field-hint" v-else>{{ form.tanggalKirim | tanggal }}</p>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="do-total">Total harga</label>
+                            <input id="do-total" type="text" :value="form.total | rupiah" readonly>
+                            <p class="field-hint">Mengikuti harga paket.</p>
+                        </div>
+
+                        <div class="form-field span-all" :class="{ 'has-error': submitAttempted && formErrors.paketKode }">
+                            <label for="do-paket">Paket bahan ajar</label>
+                            <select id="do-paket" v-model="form.paketKode">
+                                <option value="" disabled>Pilih paket</option>
+                                <option v-for="item in paket" :key="item.kode" :value="item.kode">{{ item.kode }} &mdash; {{ item.nama }}</option>
+                            </select>
+                            <p class="field-error" v-if="submitAttempted && formErrors.paketKode">{{ formErrors.paketKode }}</p>
+
+                            <!-- Detail isi paket muncul tepat di bawah select setelah paket dipilih. -->
+                            <div class="package-detail" v-show="selectedPaket" aria-live="polite">
+                                <template v-if="selectedPaket">
+                                    <p>Isi {{ selectedPaket.nama }}:</p>
+                                    <ul>
+                                        <li v-for="kode in selectedPaket.isi" :key="kode">
+                                            <strong>{{ kode }}</strong> &ndash; {{ judulBahanAjar(kode) }}
+                                        </li>
+                                    </ul>
+                                    <p class="package-price">Harga paket: <strong>{{ selectedPaket.harga | rupiah }}</strong></p>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="form-feedback feedback-error" v-if="submitAttempted && !isFormValid" role="alert">
+                        Data DO belum lengkap. Periksa kembali kolom yang ditandai merah.
+                    </p>
+
+                    <div class="form-actions">
+                        <p class="keyboard-hint">Tekan <kbd>Enter</kbd> untuk menyimpan DO.</p>
+                        <button class="button button-outline" type="button" @click="resetForm">Kosongkan form</button>
+                        <button class="button button-primary" type="submit">Simpan DO</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- ===== PRATINJAU DO ===== -->
+            <!-- Ikut berubah saat form diketik, karena memakai data yang sama (two-way binding v-model). -->
+            <aside class="panel preview-panel" aria-labelledby="preview-title">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Pratinjau</p>
+                        <h2 id="preview-title" v-text="nextNomorDO"></h2>
+                    </div>
+                </div>
+                <dl class="preview-list">
+                    <div>
+                        <dt>Nama / NIM</dt>
+                        <dd>{{ form.nama || '-' }} <span v-if="form.nim">({{ form.nim }})</span></dd>
+                    </div>
+                    <div>
+                        <dt>Ekspedisi</dt>
+                        <dd>{{ selectedEkspedisi ? 'JNE ' + selectedEkspedisi.nama : '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Tanggal kirim</dt>
+                        <dd>{{ form.tanggalKirim | tanggal }}</dd>
+                    </div>
+                    <div>
+                        <dt>Paket</dt>
+                        <dd>{{ selectedPaket ? selectedPaket.nama : '-' }}</dd>
+                    </div>
+                    <div class="preview-total">
+                        <dt>Total harga</dt>
+                        <dd>{{ form.total | rupiah }}</dd>
+                    </div>
+                </dl>
+            </aside>
+        </div>
+    </div>
+</template>

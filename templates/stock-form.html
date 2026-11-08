@@ -1,0 +1,85 @@
+<template id="tpl-stock-form">
+    <form novalidate @submit.prevent="simpan" @keydown.enter="simpanDenganEnter">
+        <div class="form-grid">
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.kode }">
+                <label for="stock-kode">Kode mata kuliah</label>
+                <input
+                    id="stock-kode"
+                    type="text"
+                    maxlength="9"
+                    placeholder="Contoh: EKMA4116"
+                    :readonly="isEdit"
+                    v-model.trim="form.kode"
+                >
+                <p class="field-error" v-if="submitAttempted && formErrors.kode">{{ formErrors.kode }}</p>
+                <p class="field-hint" v-else-if="isEdit">Kode tidak dapat diubah.</p>
+                <p class="field-hint" v-else-if="kodeInfo">{{ kodeInfo }}</p>
+            </div>
+
+            <div class="form-field span-2" :class="{ 'has-error': submitAttempted && formErrors.judul }">
+                <label for="stock-judul">Nama mata kuliah</label>
+                <input id="stock-judul" type="text" placeholder="Contoh: Pengantar Manajemen" v-model="form.judul">
+                <p class="field-error" v-if="submitAttempted && formErrors.judul">{{ formErrors.judul }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.kategori }">
+                <label for="stock-kategori">Kategori</label>
+                <select id="stock-kategori" v-model="form.kategori">
+                    <option value="" disabled>Pilih kategori</option>
+                    <option v-for="kategori in kategoriList" :key="kategori" :value="kategori">{{ kategori }}</option>
+                </select>
+                <p class="field-error" v-if="submitAttempted && formErrors.kategori">{{ formErrors.kategori }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.upbjj }">
+                <label for="stock-upbjj">UT-Daerah</label>
+                <select id="stock-upbjj" v-model="form.upbjj" :disabled="isEdit">
+                    <option value="" disabled>Pilih UT-Daerah</option>
+                    <option v-for="upbjj in upbjjList" :key="upbjj" :value="upbjj">{{ upbjj }}</option>
+                </select>
+                <p class="field-error" v-if="submitAttempted && formErrors.upbjj">{{ formErrors.upbjj }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.lokasiRak }">
+                <label for="stock-rak">Lokasi rak</label>
+                <input id="stock-rak" type="text" placeholder="Contoh: R1-A3" v-model.trim="form.lokasiRak">
+                <p class="field-error" v-if="submitAttempted && formErrors.lokasiRak">{{ formErrors.lokasiRak }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.harga }">
+                <label for="stock-harga">Harga (Rp)</label>
+                <input id="stock-harga" type="number" min="1" placeholder="Contoh: 65000" v-model.number="form.harga">
+                <p class="field-error" v-if="submitAttempted && formErrors.harga">{{ formErrors.harga }}</p>
+                <p class="field-hint" v-else-if="form.harga > 0">{{ form.harga | rupiah }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.qty }">
+                <label for="stock-qty">Jumlah stok (buah)</label>
+                <input id="stock-qty" type="number" min="0" placeholder="Contoh: 25" v-model.number="form.qty">
+                <p class="field-error" v-if="submitAttempted && formErrors.qty">{{ formErrors.qty }}</p>
+            </div>
+
+            <div class="form-field" :class="{ 'has-error': submitAttempted && formErrors.safety }">
+                <label for="stock-safety">Safety stock (buah)</label>
+                <input id="stock-safety" type="number" min="1" placeholder="Contoh: 10" v-model.number="form.safety">
+                <p class="field-error" v-if="submitAttempted && formErrors.safety">{{ formErrors.safety }}</p>
+            </div>
+
+            <div class="form-field span-all">
+                <label for="stock-catatan">Catatan (opsional)</label>
+                <input id="stock-catatan" type="text" placeholder="Contoh: Edisi 2026, cetak ulang" v-model="form.catatan">
+                <p class="field-hint">Catatan tampil sebagai tooltip saat kursor diarahkan ke kolom Status.</p>
+            </div>
+        </div>
+
+        <p class="form-feedback feedback-error" v-if="submitAttempted && !isFormValid" role="alert">
+            Data belum valid. Periksa kembali kolom yang ditandai merah.
+        </p>
+
+        <div class="form-actions">
+            <p class="keyboard-hint">Tekan <kbd>Enter</kbd> untuk menyimpan, <kbd>Esc</kbd> untuk menutup.</p>
+            <button class="button button-outline" type="button" @click="$emit('cancel')">Batal</button>
+            <button class="button button-primary" type="submit" v-text="isEdit ? 'Simpan perubahan' : 'Tambah bahan ajar'"></button>
+        </div>
+    </form>
+</template>

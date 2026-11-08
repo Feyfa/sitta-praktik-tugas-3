@@ -1,0 +1,184 @@
+<template id="tpl-tracking">
+    <div>
+        <!-- ===== JUDUL HALAMAN ===== -->
+        <div class="page-intro page-intro-row">
+            <div>
+                <p class="eyebrow">Layanan pengiriman</p>
+                <h1>Tracking Delivery Order</h1>
+                <p class="muted-copy">Cari DO berdasarkan nomor DO atau NIM untuk melihat status pengiriman.</p>
+            </div>
+            <div class="summary-row">
+                <div class="stat-card">
+                    Jumlah DO tercatat
+                    <strong v-text="jumlahDO"></strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== PENCARIAN DO ===== -->
+        <section class="panel" aria-labelledby="search-title">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Pencarian pesanan</p>
+                    <h2 id="search-title">Cari Delivery Order</h2>
+                </div>
+            </div>
+
+            <div class="segmented" role="radiogroup" aria-label="Cari berdasarkan">
+                <label :class="{ 'is-active': searchMode === 'nomor' }">
+                    <input type="radio" name="search-mode" value="nomor" v-model="searchMode">
+                    Nomor DO
+                </label>
+                <label :class="{ 'is-active': searchMode === 'nim' }">
+                    <input type="radio" name="search-mode" value="nim" v-model="searchMode">
+                    NIM
+                </label>
+            </div>
+
+            <div class="search-form">
+                <div class="form-field search-field">
+                    <label for="tracking-keyword" v-text="searchMode === 'nomor' ? 'Nomor Delivery Order' : 'NIM mahasiswa'"></label>
+                    <input
+                        id="tracking-keyword"
+                        type="text"
+                        autocomplete="off"
+                        :placeholder="searchMode === 'nomor' ? 'Contoh: DO2025-0001' : 'Contoh: 123456789'"
+                        v-model="keyword"
+                        @keyup.enter="cari"
+                        @keyup.esc="resetPencarian"
+                    >
+                </div>
+                <button class="button button-primary" type="button" @click="cari">Cari</button>
+                <button class="button button-outline" type="button" @click="resetPencarian">Reset</button>
+            </div>
+            <p class="keyboard-hint">Tekan <kbd>Enter</kbd> untuk mencari, <kbd>Esc</kbd> untuk mengosongkan pencarian.</p>
+
+            <p class="form-feedback feedback-error" v-if="searchError" role="alert">{{ searchError }}</p>
+
+            <!-- Pencarian NIM bisa menemukan lebih dari satu DO; pengguna memilih DO yang ingin dilihat. -->
+            <div class="result-list" v-if="results.length > 1">
+                <p>Ditemukan {{ results.length }} DO:</p>
+                <button
+                    v-for="nomor in results"
+                    :key="nomor"
+                    class="button button-outline button-small"
+                    :class="{ 'is-active': nomor === activeNumber }"
+                    type="button"
+                    @click="lihatDO(nomor)"
+                >{{ nomor }}</button>
+            </div>
+        </section>
+
+        <!-- ===== HASIL TRACKING ===== -->
+        <section class="panel" ref="hasil" v-if="activeOrder" aria-live="polite">
+            <div class="order-heading">
+                <div>
+                    <p class="eyebrow">Nomor DO {{ activeNumber }}</p>
+                    <h2 v-text="activeOrder.nama"></h2>
+                </div>
+                <span class="status-badge" :class="statusClass(activeOrder.status)">{{ activeOrder.status }}</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-heading">
+                    <strong>Status perjalanan</strong>
+                    <span>{{ progressLabel }} ({{ progress }}%)</span>
+                </div>
+                <div
+                    class="progress-track"
+                    role="progressbar"
+                    aria-label="Progres pengiriman"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    :aria-valuenow="progress"
+                >
+                    <span class="progress-bar" :style="{ width: progress + '%' }"></span>
+                </div>
+            </div>
+
+            <dl class="details-grid">
+                <div>
+                    <dt>NIM</dt>
+                    <dd>{{ activeOrder.nim }}</dd>
+                </div>
+                <div>
+                    <dt>Ekspedisi</dt>
+                    <dd>{{ activeOrder.ekspedisi }}</dd>
+                </div>
+                <div>
+                    <dt>Tanggal kirim</dt>
+                    <dd>{{ activeOrder.tanggalKirim | tanggal }}</dd>
+                </div>
+                <div>
+                    <dt>Paket bahan ajar</dt>
+                    <dd>{{ activeOrder.paket }} &middot; {{ namaPaket(activeOrder.paket) }}</dd>
+                </div>
+                <div>
+                    <dt>Total pembayaran</dt>
+                    <dd>{{ activeOrder.total | rupiah }}</dd>
+                </div>
+            </dl>
+
+            <div class="timeline-heading">
+                <p class="eyebrow">Perjalanan paket</p>
+                <h3>Riwayat pengiriman</h3>
+            </div>
+            <ol class="timeline">
+                <li v-for="(event, index) in sortedEvents" :key="index">
+                    <time :datetime="event.waktu.replace(' ', 'T')">{{ event.waktu | waktu }}</time>
+                    <p>{{ event.keterangan }}</p>
+                </li>
+            </ol>
+
+            <!-- ===== FORM TAMBAH PROGRES PERJALANAN ===== -->
+            <div class="progress-form">
+                <p class="eyebrow">Update perjalanan</p>
+                <div class="progress-form-fields">
+                    <div class="form-field" :class="{ 'has-error': progressAttempted && progressError }">
+                        <label for="progress-keterangan">Keterangan</label>
+                        <input
+                            id="progress-keterangan"
+                            type="text"
+                            placeholder="Contoh: Tiba di Hub: JAKSEL"
+                            v-model="progressForm.keterangan"
+                            @keyup.enter="tambahProgres"
+                        >
+                        <p class="field-error" v-if="progressAttempted && progressError">{{ progressError }}</p>
+                    </div>
+                    <div class="form-field">
+                        <label for="progress-status">Status</label>
+                        <select id="progress-status" v-model="progressForm.status">
+                            <option v-for="status in statusList" :key="status" :value="status">{{ status }}</option>
+                        </select>
+                    </div>
+                    <button class="button button-primary" type="button" @click="tambahProgres">Tambah progres</button>
+                </div>
+                <p class="keyboard-hint">Waktu diisi otomatis dari jam perangkat. Tekan <kbd>Enter</kbd> pada kolom keterangan untuk menyimpan.</p>
+            </div>
+        </section>
+
+        <section class="panel" v-else>
+            <p class="empty-state">Belum ada DO yang ditampilkan. Cari nomor DO atau NIM, atau pilih DO dari daftar di bawah.</p>
+        </section>
+
+        <!-- ===== DAFTAR SEMUA DO ===== -->
+        <section class="panel" aria-labelledby="list-title">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Data tersimpan</p>
+                    <h2 id="list-title">Daftar DO</h2>
+                </div>
+            </div>
+            <!-- v-for pada object memberi value, key (nomor DO sebagai name-based index), dan urutan. -->
+            <ul class="do-list">
+                <li v-for="(order, nomor, index) in tracking" :key="nomor" :class="{ 'is-active': nomor === activeNumber }">
+                    <div>
+                        <strong>{{ index + 1 }}. {{ nomor }}</strong>
+                        <span>{{ order.nama }} &middot; NIM {{ order.nim }} &middot; {{ order.status }}</span>
+                    </div>
+                    <button class="button button-outline button-small" type="button" @click="lihatDO(nomor)">Lihat</button>
+                </li>
+            </ul>
+        </section>
+    </div>
+</template>

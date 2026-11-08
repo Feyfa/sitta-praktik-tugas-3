@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#173b66">
+    <title>SITTA | Universitas Terbuka</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div id="app" v-cloak>
+        <!-- ===== HEADER DAN NAVIGASI TAB ===== -->
+        <header class="site-header">
+            <a class="brand" href="index.html" aria-label="SITTA, muat ulang aplikasi">
+                <span class="brand-mark" aria-hidden="true">UT</span>
+                <span class="brand-name">SITTA <small>Universitas Terbuka</small></span>
+            </a>
+            <nav class="main-nav" aria-label="Menu utama">
+                <button class="nav-link" :class="{ 'is-active': tab === 'stok' }" type="button" @click="tab = 'stok'">
+                    Stok Bahan Ajar
+                    <span class="nav-count" v-if="reorderCount > 0" :title="reorderCount + ' bahan ajar perlu re-order'">{{ reorderCount }}</span>
+                </button>
+                <button class="nav-link" :class="{ 'is-active': tab === 'tracking' }" type="button" @click="tab = 'tracking'">
+                    Tracking DO
+                </button>
+                <button class="nav-link" :class="{ 'is-active': tab === 'order' }" type="button" @click="tab = 'order'">
+                    Pemesanan
+                </button>
+            </nav>
+        </header>
+
+        <main class="page-shell">
+            <!-- ===== STATUS MEMUAT DATA ===== -->
+            <p class="loading-state" v-if="loading">Memuat data bahan ajar&hellip;</p>
+
+            <section class="panel load-error" v-else-if="loadError" role="alert">
+                <p class="eyebrow">Data gagal dimuat</p>
+                <h2>Aplikasi perlu dijalankan lewat server lokal</h2>
+                <p>
+                    Data dan template dibaca dengan <code>fetch</code>, yang diblokir browser bila
+                    <code>index.html</code> dibuka dengan klik dua kali. Jalankan
+                    <code>python3 -m http.server 8000</code> di folder proyek, lalu buka
+                    <code>http://localhost:8000</code>.
+                </p>
+                <p class="field-hint">Detail: {{ loadError }}</p>
+            </section>
+
+            <!-- ===== HALAMAN PER TAB ===== -->
+            <template v-else>
+                <section v-show="tab === 'stok'">
+                    <ba-stock-table
+                        :items="state.stok"
+                        :upbjj-list="state.upbjjList"
+                        :kategori-list="state.kategoriList"
+                        @create="tambahStok"
+                        @update="ubahStok"
+                        @delete="hapusStok"
+                    ></ba-stock-table>
+                </section>
+
+                <section v-show="tab === 'tracking'">
+                    <do-tracking
+                        ref="tracking"
+                        :tracking="state.tracking"
+                        :paket="state.paket"
+                        @add-progress="tambahProgres"
+                    ></do-tracking>
+                </section>
+
+                <section v-show="tab === 'order'">
+                    <order-form
+                        :tracking="state.tracking"
+                        :paket="state.paket"
+                        :ekspedisi="state.pengirimanList"
+                        :stok="state.stok"
+                        @created="handleNewDO"
+                    ></order-form>
+                </section>
+            </template>
+        </main>
+
+        <p class="toast" v-if="notice" role="status">{{ notice }}</p>
+    </div>
+
+    <!-- Urutan script penting: Vue dulu, lalu helper, data service, filter, komponen, dan terakhir root. -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+    <script src="js/helpers.js"></script>
+    <script src="js/services/api.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/components/status-badge.js"></script>
+    <script src="js/components/app-modal.js"></script>
+    <script src="js/components/stock-form.js"></script>
+    <script src="js/components/stock-table.js"></script>
+    <script src="js/components/do-tracking.js"></script>
+    <script src="js/components/order-form.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

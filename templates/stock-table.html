@@ -1,0 +1,198 @@
+<template id="tpl-stock">
+    <div>
+        <!-- ===== JUDUL HALAMAN DAN RINGKASAN STOK ===== -->
+        <div class="page-intro page-intro-row">
+            <div>
+                <p class="eyebrow">Katalog bahan ajar</p>
+                <h1>Stok Bahan Ajar</h1>
+                <p class="muted-copy">Daftar stok bahan ajar untuk seluruh UT-Daerah.</p>
+            </div>
+            <div class="summary-row">
+                <div class="stat-card">
+                    Jumlah judul tercatat
+                    <strong v-text="items.length"></strong>
+                </div>
+                <div class="stat-card stat-card-warning">
+                    Perlu re-order
+                    <strong v-text="reorderCount"></strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FILTER DAN SORT ===== -->
+        <section class="panel" aria-labelledby="filter-title">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Penyaringan data</p>
+                    <h2 id="filter-title">Filter dan urutkan</h2>
+                </div>
+            </div>
+
+            <div class="filter-layout">
+                <!-- Kelompok filter: menentukan data mana yang tampil. -->
+                <div class="filter-group">
+                    <p class="filter-group-title">Filter</p>
+
+                    <div class="filter-fields">
+                        <div class="form-field">
+                            <label for="filter-upbjj">UT-Daerah</label>
+                            <select id="filter-upbjj" v-model="filters.upbjj">
+                                <option value="">Semua UT-Daerah</option>
+                                <option v-for="upbjj in upbjjList" :key="upbjj" :value="upbjj">{{ upbjj }}</option>
+                            </select>
+                        </div>
+
+                        <!-- Dependent options: filter kategori baru muncul setelah UT-Daerah dipilih,
+                             dan pilihannya hanya kategori yang tersedia di UT-Daerah tersebut. -->
+                        <div class="form-field" v-if="filters.upbjj !== ''">
+                            <label for="filter-kategori">Kategori mata kuliah</label>
+                            <select id="filter-kategori" v-model="filters.kategori">
+                                <option value="">Semua kategori</option>
+                                <option v-for="kategori in kategoriOptions" :key="kategori" :value="kategori">{{ kategori }}</option>
+                            </select>
+                        </div>
+                        <p class="filter-placeholder" v-else>Pilih UT-Daerah untuk memunculkan filter kategori.</p>
+                    </div>
+
+                    <label class="toggle-chip" :class="{ 'is-active': filters.reorderOnly }">
+                        <input type="checkbox" v-model="filters.reorderOnly">
+                        Hanya stok menipis &amp; kosong
+                        <span class="toggle-count" v-text="reorderCount"></span>
+                    </label>
+                </div>
+
+                <!-- Kelompok urutkan: menentukan urutan data yang tampil. -->
+                <div class="filter-group filter-group-sort">
+                    <p class="filter-group-title">Urutkan</p>
+
+                    <div class="form-field">
+                        <label for="sort-key">Urutkan berdasarkan</label>
+                        <div class="sort-control">
+                            <select id="sort-key" v-model="sort.key">
+                                <option v-for="option in sortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                            </select>
+                            <button
+                                class="button button-outline sort-direction"
+                                type="button"
+                                :title="'Ubah arah urutan (sekarang ' + sortDirectionLabel.toLowerCase() + ')'"
+                                @click="toggleSortDirection"
+                            >
+                                <template v-if="sort.direction === 'asc'">&uarr; Naik</template>
+                                <template v-else>&darr; Turun</template>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-footer">
+                <p class="filter-summary">
+                    Menampilkan <strong>{{ sortedStok.length }}</strong> dari {{ items.length }} data
+                    &middot; {{ sortDirectionLabel.toLowerCase() }}
+                    <span class="filter-active-note" v-show="isFilterActive">&middot; filter aktif</span>
+                </p>
+                <button class="button button-outline button-small" type="button" :disabled="!canReset" @click="resetFilter">
+                    &#8634; Reset filter
+                </button>
+            </div>
+        </section>
+
+        <!-- ===== TABEL STOK ===== -->
+        <section class="panel" aria-labelledby="table-title">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Daftar bahan ajar</p>
+                    <h2 id="table-title">Stok per UT-Daerah</h2>
+                </div>
+                <button class="button button-primary" type="button" @click="bukaFormTambah">+ Tambah bahan ajar</button>
+            </div>
+
+            <div class="table-toolbar">
+                <div class="status-legend" aria-label="Keterangan status">
+                    <span class="status-chip status-aman">&#10004; Aman</span>
+                    <span class="status-chip status-menipis">&#9888; Menipis</span>
+                    <span class="status-chip status-kosong">&#10006; Kosong</span>
+                </div>
+                <p class="field-hint">Arahkan kursor ke kolom Status untuk melihat catatan.</p>
+            </div>
+
+            <p class="form-feedback" v-if="feedback" role="status">{{ feedback }}</p>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="number-cell">No</th>
+                            <th scope="col">Kode / Mata kuliah</th>
+                            <th scope="col">Kategori</th>
+                            <th scope="col">UT-Daerah</th>
+                            <th scope="col">Lokasi rak</th>
+                            <th scope="col" class="number-cell">Harga</th>
+                            <th scope="col" class="number-cell">Stok</th>
+                            <th scope="col" class="number-cell">Safety</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- index dari v-for dimulai dari 0 (zero-based), jadi nomor baris = index + 1. -->
+                        <tr v-for="(item, index) in sortedStok" :key="rowKey(item)">
+                            <td class="number-cell muted-cell">{{ index + 1 }}</td>
+                            <td class="title-cell">
+                                <span class="code-cell">{{ item.kode }}</span>
+                                <strong>{{ item.judul }}</strong>
+                            </td>
+                            <td>{{ item.kategori }}</td>
+                            <td>{{ item.upbjj }}</td>
+                            <td>{{ item.lokasiRak }}</td>
+                            <td class="number-cell">{{ item.harga | rupiah }}</td>
+                            <td class="number-cell"><strong>{{ item.qty | satuan }}</strong></td>
+                            <td class="number-cell">{{ item.safety | satuan }}</td>
+                            <td>
+                                <status-badge :qty="item.qty" :safety="item.safety" :catatan="item.catatanHTML"></status-badge>
+                            </td>
+                            <td>
+                                <div class="row-actions">
+                                    <button class="button button-outline button-small" type="button" @click="bukaFormEdit(item)">Edit</button>
+                                    <button class="button button-outline-danger button-small" type="button" @click="tanyaHapus(item)">Hapus</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="empty-state" v-if="sortedStok.length === 0">
+                Tidak ada bahan ajar yang cocok dengan filter. Tekan <strong>Reset filter</strong> untuk menampilkan semua data.
+            </p>
+        </section>
+
+        <!-- ===== MODAL FORM TAMBAH / EDIT ===== -->
+        <app-modal :show="formMode !== ''" :title="formTitle" @close="tutupForm">
+            <ba-stock-form
+                v-if="formMode !== ''"
+                :mode="formMode"
+                :item="editingItem"
+                :items="items"
+                :upbjj-list="upbjjList"
+                :kategori-list="kategoriList"
+                @submit="simpanForm"
+                @cancel="tutupForm"
+            ></ba-stock-form>
+        </app-modal>
+
+        <!-- ===== MODAL KONFIRMASI HAPUS ===== -->
+        <app-modal :show="deletingItem !== null" title="Hapus bahan ajar?" @close="batalHapus">
+            <template v-if="deletingItem">
+                <p class="modal-text">
+                    Data <strong>{{ deletingItem.kode }} &ndash; {{ deletingItem.judul }}</strong>
+                    di UT-Daerah {{ deletingItem.upbjj }} akan dihapus dari daftar stok.
+                </p>
+                <div class="form-actions">
+                    <button class="button button-outline" type="button" data-autofocus @click="batalHapus">Batal</button>
+                    <button class="button button-danger" type="button" @click="konfirmasiHapus">Ya, hapus</button>
+                </div>
+            </template>
+        </app-modal>
+    </div>
+</template>
